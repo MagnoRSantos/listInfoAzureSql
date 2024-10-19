@@ -1,0 +1,7 @@
+## ignore directories and files
+db/
+log/
+.env*
+.env.pro
+listDbsAzureSql_TSQL.py
+sqlserver/
