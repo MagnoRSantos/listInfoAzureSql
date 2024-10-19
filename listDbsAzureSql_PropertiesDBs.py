@@ -465,13 +465,13 @@ def gravaDadosDestinoAzureSQL(listSource):
 
 ## FUNCAO INICIAL
 def main():
+    
     ## log do inicio da aplicacao
-    GravaLog('', 'w')
     datahora = obterDataHora()
-    msgLog = '\n***** Inicio da aplicacao: {0}'.format(datahora)
-    print(GravaLog(msgLog, 'a'))
+    msgLog = '***** Inicio da aplicacao: {0}'.format(datahora)
+    print(GravaLog(msgLog, 'w'))
 
-    #listServers = ['azuredbserver01', 'azuredbserver02']
+    #listServers = ['SERVER01', 'SERVER02']
     listServers = ['SERVER01']
 
     for server in listServers:
