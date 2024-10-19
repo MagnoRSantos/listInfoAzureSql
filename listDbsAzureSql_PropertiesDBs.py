@@ -5,7 +5,6 @@ import os, io
 import sqlite3
 import dotenv
 import pyodbc as po
-#import json
 import pandas as pd
 from tabulate import tabulate
 from datetime import datetime
@@ -30,7 +29,7 @@ def GravaLog(strValue, strAcao):
     ## Path LogFile
     datahoraLog = datetime.now().strftime('%Y-%m-%d')
     pathLog = os.path.join(dirapp, 'log')
-    pathLogFile = os.path.join(pathLog, 'loginfoDatabaseAzureSqlApi.txt')
+    pathLogFile = os.path.join(pathLog, 'loginfoDatabaseAzureSql.txt')
 
     if not os.path.exists(pathLog):
         os.makedirs(pathLog)
@@ -48,11 +47,11 @@ def GravaLog(strValue, strAcao):
 def strConnectionDatabaseOrigem(p_server):
 
     #variaveis de conexao azuresql
-    if p_server == 'azuredb040':
-        server   = os.getenv("SERVER_SOURCE_AZURESQL")
+    if p_server == 'SERVER01':
+        server   = os.getenv("SERVER_SOURCE_SERVER01_AZURESQL")
 
-    if p_server == 'sonarqube':
-        server   = os.getenv("SERVER_SOURCE_SONARQUBE_AZURESQL")
+    if p_server == 'SERVER02':
+        server   = os.getenv("SERVER_SOURCE_SERVER02_AZURESQL")
 
     port     = os.getenv("PORT_SOURCE_AZURESQL")
     database = os.getenv("DATABASE_SOURCE_AZURESQL") ##"##DATABASE.NAME##"
@@ -307,7 +306,7 @@ def create_tables(dbname_sqlite3):
 
 ## gera comandos de inserts conforme valores da lista passada
 def gravaDadosSqlite(v_ListInfoDbs):
-    dbname_sqlite3 = "database_bi.db"
+    dbname_sqlite3 = os.getenv("DATABASE_TARGET_SQLITE")
     path_dir_db = os.path.join(dirapp, 'db')
     path_full_dbname_sqlite3 = os.path.join(path_dir_db, dbname_sqlite3)
     RowCount = 0
@@ -473,7 +472,7 @@ def main():
     print(GravaLog(msgLog, 'a'))
 
     #listServers = ['azuredbserver01', 'azuredbserver02']
-    listServers = ['azuredbserver01']
+    listServers = ['SERVER01']
 
     for server in listServers:
         lisdtdbNames = getListNameDatabasesOrigem(server)
