@@ -472,8 +472,8 @@ def main():
     msgLog = '\n***** Inicio da aplicacao: {0}'.format(datahora)
     print(GravaLog(msgLog, 'a'))
 
-    #listServers = ['azuredb040', 'sonarqube']
-    listServers = ['azuredb040']
+    #listServers = ['azuredbserver01', 'azuredbserver02']
+    listServers = ['azuredbserver01']
 
     for server in listServers:
         lisdtdbNames = getListNameDatabasesOrigem(server)
