@@ -478,7 +478,12 @@ def main():
     for server in listServers:
         lisdtdbNames = getListNameDatabasesOrigem(server)
         listInfoDatabases = getListInfoDatabasesOrigem(server, lisdtdbNames)
+        
+        # grava dados no SQLite como destino dos dados
         gravaDadosSqlite(listInfoDatabases)
+        
+        # grava dados no SQL Server/Azure SQL como destino dos dados
+        # para isso tirar o comentario da chamada da funcao
         #gravaDadosDestinoAzureSQL(listInfoDatabases)
 
     exibeDadosSqlite()
