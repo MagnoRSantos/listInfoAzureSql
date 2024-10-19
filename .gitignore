@@ -2,6 +2,6 @@
 db/
 log/
 .env*
-.env.pro
+.env.prod
 listDbsAzureSql_TSQL.py
 sqlserver/
