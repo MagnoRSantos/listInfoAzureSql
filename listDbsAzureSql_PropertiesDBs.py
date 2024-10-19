@@ -354,12 +354,12 @@ def gravaDadosSqlite(v_ListInfoDbs):
     except sqlite3.Error as e:
         datahora = obterDataHora()
         msgException = "Error: {0}".format(e)
-        msgLog = 'Fim Insert tabela SQlite3 [infoDatabaseAzureSqlApi] [Erro]: {0}\n{1}'.format(datahora, msgException)
+        msgLog = 'Fim Insert tabela SQlite3 [infoDatabaseAzureSql] [Erro]: {0}\n{1}'.format(datahora, msgException)
         print(GravaLog(msgLog, 'a'))
 
     finally:
         RowCount = RowCountInsert - RowCountDelete
-        msgLog = 'Quantidade de Registros Inseridos na tabela [infoDatabaseAzureSqlApi]: {0} registro(s)'.format(RowCount)
+        msgLog = 'Quantidade de Registros Inseridos na tabela [infoDatabaseAzureSql]: {0} registro(s)'.format(RowCount)
         print(GravaLog(msgLog, 'a'))
 
 
