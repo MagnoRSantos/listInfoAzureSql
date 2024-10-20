@@ -419,8 +419,9 @@ def gravaDadosDestinoAzureSQL(listSource):
             v_namedb = str(listSource[i][1])
 
             ## sql statement DELETE
-            sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '{}';".format(v_namedb)
-            cursor.execute(sqlcmdDELETE)
+            #sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '{}';".format(v_namedb)
+            sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '?;"
+            cursor.execute(sqlcmdDELETE, (v_namedb,))
 
         ## sql statement INSERT
         sqlcmd = '''
