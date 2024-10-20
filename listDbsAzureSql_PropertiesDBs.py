@@ -329,8 +329,9 @@ def gravaDadosSqlite(v_ListInfoDbs):
                 v_namedb = str(v_ListInfoDbs[i][1])
 
                 ## sql statement DELETE
-                sqlcmdDELETE = "DELETE FROM infoDatabaseAzureSql WHERE Database = '{}';".format(v_namedb)
-                cur.execute(sqlcmdDELETE)
+                #sqlcmdDELETE = "DELETE FROM infoDatabaseAzureSql WHERE Database = '{}';".format(v_namedb)
+                sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = ?;"
+                cur.execute(sqlcmdDELETE, (v_namedb,))
 
             conn.commit()
             RowCountDelete = conn.total_changes
@@ -420,7 +421,7 @@ def gravaDadosDestinoAzureSQL(listSource):
 
             ## sql statement DELETE
             #sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '{}';".format(v_namedb)
-            sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '?;"
+            sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = ?;"
             cursor.execute(sqlcmdDELETE, (v_namedb,))
 
         ## sql statement INSERT
