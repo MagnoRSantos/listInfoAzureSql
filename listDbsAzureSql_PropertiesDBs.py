@@ -57,6 +57,14 @@ def GravaLog(strValue, strAcao):
     return msg
 
 
+## funcao de tratamento de log de exceptions
+def log_error(e, msgLog):
+    datahora = obterDataHora()
+    full_msgLog = "{0} - {1}:\n{2}".format(msgLog, datahora, str(e))
+    print(GravaLog(full_msgLog, 'a'))
+
+
+
 ## funcao de formacao da connString Database de origem
 def strConnectionDatabaseOrigem(p_server):
 
@@ -121,10 +129,8 @@ def getListNameDatabasesOrigem(p_server):
         #listDbNames = list(cursor.fetchall())
 
     except Exception as e:
-        datahora = obterDataHora()
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Erro ao obter os nomes dos databases: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro ao obter os nomes dos databases'
+        log_error(e, msgLog)
 
     finally:
         if 'cursor' in locals():
@@ -252,10 +258,8 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
 
 
     except Exception as e:
-        datahora = obterDataHora()
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Erro ao obter informacoes dos databases: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro ao obter informacoes dos databases'
+        log_error(e, msgLog)
 
     finally:
         if 'cursor' in locals():
@@ -313,10 +317,9 @@ def create_tables(dbname_sqlite3):
 
             cnxn.commit()
     except sqlite3.Error as e:
-        datahora = obterDataHora()
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Criar tabela SQlite3 [infoDatabaseAzureSql] [Erro]: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro ao criar tabela SQlite3 [infoDatabaseAzureSql]'
+        log_error(e, msgLog)
+
     finally:
         msgLog = 'Criado tabela [infoDatabaseAzureSql] no database [{0}]'.format(dbname_sqlite3)
         print(GravaLog(msgLog, 'a'))
@@ -371,10 +374,8 @@ def gravaDadosSqlite(v_ListInfoDbs):
             cnxn.commit()
 
     except sqlite3.Error as e:
-        datahora = obterDataHora()
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Fim Insert tabela SQlite3 [infoDatabaseAzureSql] [Erro]: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro na operacao insert na tabela SQlite3 [infoDatabaseAzureSql]'
+        log_error(e, msgLog)
 
     finally:
         RowCount = RowCountInsert - RowCountDelete
@@ -412,10 +413,8 @@ def exibeDadosSqlite():
             print(GravaLog(v_out_table, 'a'))
 
     except sqlite3.Error as e:
-        datahora = obterDataHora()
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Fim Select tabela SQlite3 [infoDatabaseAzureSql] [Erro]: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro na operacao de select na tabela SQlite3 [infoDatabaseAzureSql]'
+        log_error(e, msgLog)
 
     finally:
         msgLog = 'Fim Select tabela SQlite3 [infoDatabaseAzureSql]'
@@ -463,10 +462,8 @@ def gravaDadosDestinoAzureSQL(listSource):
 
 
     except Exception as e:
-        datahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        msgException = "Error: {0}".format(e)
-        msgLog = 'Fim insercao de dados no destino AzureSQL - [Erro]: {0}\n{1}'.format(datahora, msgException)
-        print(GravaLog(msgLog, 'a'))
+        msgLog = 'Erro na operacao de insert na tabela AzureSQL [InfoDatabaseAzureSql]'
+        log_error(e, msgLog)
         cnxn.rollback()
 
     else:
