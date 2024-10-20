@@ -23,8 +23,8 @@ def getValueEnv(valueEnv):
     v_valueEnv = os.getenv(valueEnv)
     if not v_valueEnv:
 
-        msgLog = "Variável de ambiente '{0}' não encontrada.".format(v_valueEnv)
-        #raise ValueError("Variável de ambiente '{0}' não encontrada.".format(v_valueEnv))
+        msgLog = "Variável de ambiente '{0}' não encontrada.".format(valueEnv)
+        #raise ValueError("Variável de ambiente '{0}' não encontrada.".format(valueEnv))
         print(GravaLog(msgLog, 'a'))
 
     return v_valueEnv
