@@ -17,6 +17,20 @@ dirapp = os.path.dirname(os.path.realpath(__file__))
 dotenvProd = os.path.join(dirapp, '.env.prod')
 dotenv.load_dotenv(dotenvProd)
 
+
+## funcao para verificar os valores do dotenv
+def getValueEnv(valueEnv):
+    v_valueEnv = os.getenv(valueEnv)
+    if not v_valueEnv:
+
+        msgLog = "Variável de ambiente '{0}' não encontrada.".format(v_valueEnv)
+        #raise ValueError("Variável de ambiente '{0}' não encontrada.".format(v_valueEnv))
+        print(GravaLog(msgLog, 'a'))
+
+    return v_valueEnv
+        
+
+
 ## funcao que retorna data e hora Y-M-D H:M:S
 def obterDataHora():
     datahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -48,15 +62,15 @@ def strConnectionDatabaseOrigem(p_server):
 
     #variaveis de conexao azuresql
     if p_server == 'SERVER01':
-        server   = os.getenv("SERVER_SOURCE_SERVER01_AZURESQL")
+        server   = getValueEnv("SERVER_SOURCE_SERVER01_AZURESQL")
 
     if p_server == 'SERVER02':
-        server   = os.getenv("SERVER_SOURCE_SERVER02_AZURESQL")
+        server   = getValueEnv("SERVER_SOURCE_SERVER02_AZURESQL")
 
-    port     = os.getenv("PORT_SOURCE_AZURESQL")
-    database = os.getenv("DATABASE_SOURCE_AZURESQL") ##"##DATABASE.NAME##"
-    username = os.getenv("USERNAME_SOURCE_AZURESQL")
-    password = os.getenv("PASSWORD_SOURCE_AZURESQL")
+    port     = getValueEnv("PORT_SOURCE_AZURESQL")
+    database = getValueEnv("DATABASE_SOURCE_AZURESQL") ##"##DATABASE.NAME##"
+    username = getValueEnv("USERNAME_SOURCE_AZURESQL")
+    password = getValueEnv("PASSWORD_SOURCE_AZURESQL")
 
     strConnection = 'DRIVER={{ODBC Driver 17 for SQL Server}};\
         SERVER={v_server};\
@@ -72,11 +86,11 @@ def strConnectionDatabaseOrigem(p_server):
 def strConnectionDatabaseDestino():
 
     #variaveis de conexao azuresql
-    server   = os.getenv("SERVER_TARGET_AZURESQL")
-    port     = os.getenv("PORT_TARGET_AZURESQL")
-    database = os.getenv("DATABASE_TARGET_AZURESQL")
-    username = os.getenv("USERNAME_TARGET_AZURESQL")
-    password = os.getenv("PASSWORD_TARGET_AZURESQL")
+    server   = getValueEnv("SERVER_TARGET_AZURESQL")
+    port     = getValueEnv("PORT_TARGET_AZURESQL")
+    database = getValueEnv("DATABASE_TARGET_AZURESQL")
+    username = getValueEnv("USERNAME_TARGET_AZURESQL")
+    password = getValueEnv("PASSWORD_TARGET_AZURESQL")
 
     strConnection = 'DRIVER={{ODBC Driver 17 for SQL Server}};\
         SERVER={v_server};\
@@ -113,9 +127,11 @@ def getListNameDatabasesOrigem(p_server):
         print(GravaLog(msgLog, 'a'))
 
     finally:
-        cursor.close()
-        del cursor
-        cnxn.close()
+        if 'cursor' in locals():
+            cursor.close()
+            del cursor
+        if 'cnxn' in locals(): 
+            cnxn.close()
         datahora = obterDataHora()
         msgLog = 'Concluido a coleta dos nomes dos databases - {0}'.format(datahora)
         print(GravaLog(msgLog, 'a'))
@@ -242,9 +258,11 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
         print(GravaLog(msgLog, 'a'))
 
     finally:
-        cursor.close()
-        del cursor
-        cnxn.close()
+        if 'cursor' in locals():
+            cursor.close()
+            del cursor
+        if 'cnxn' in locals(): 
+            cnxn.close()
         datahora = obterDataHora()
         msgLog = 'Concluido a coleta das informacoes dos databases - {0}'.format(datahora)
         print(GravaLog(msgLog, 'a'))
@@ -261,7 +279,7 @@ def create_tables(dbname_sqlite3):
     """
     sql_statements = [
         """
-        CREATE TABLE "infoDatabaseAzureSql" (
+        CREATE TABLE IF NOT EXISTS "infoDatabaseAzureSql" (
             "ServerName" TEXT NOT NULL,
             "Database" TEXT NOT NULL,
             "Edition" TEXT NOT NULL,
@@ -288,12 +306,12 @@ def create_tables(dbname_sqlite3):
 
 
     try:
-        with sqlite3.connect(path_full_dbname_sqlite3) as conn:
-            cursor = conn.cursor()
+        with sqlite3.connect(path_full_dbname_sqlite3) as cnxn:
+            cursor = cnxn.cursor()
             for statement in sql_statements:
                 cursor.execute(statement)
 
-            conn.commit()
+            cnxn.commit()
     except sqlite3.Error as e:
         datahora = obterDataHora()
         msgException = "Error: {0}".format(e)
@@ -306,7 +324,7 @@ def create_tables(dbname_sqlite3):
 
 ## gera comandos de inserts conforme valores da lista passada
 def gravaDadosSqlite(v_ListInfoDbs):
-    dbname_sqlite3 = os.getenv("DATABASE_TARGET_SQLITE")
+    dbname_sqlite3 = getValueEnv("DATABASE_TARGET_SQLITE")
     path_dir_db = os.path.join(dirapp, 'db')
     path_full_dbname_sqlite3 = os.path.join(path_dir_db, dbname_sqlite3)
     RowCount = 0
@@ -320,9 +338,9 @@ def gravaDadosSqlite(v_ListInfoDbs):
 
 
     try:
-        with sqlite3.connect(path_full_dbname_sqlite3) as conn:
+        with sqlite3.connect(path_full_dbname_sqlite3) as cnxn:
 
-            cur = conn.cursor()
+            cursor = cnxn.cursor()
 
             ## sql statement DELETE
             for i in range(len(v_ListInfoDbs)):
@@ -331,10 +349,10 @@ def gravaDadosSqlite(v_ListInfoDbs):
                 ## sql statement DELETE
                 #sqlcmdDELETE = "DELETE FROM infoDatabaseAzureSql WHERE Database = '{}';".format(v_namedb)
                 sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = ?;"
-                cur.execute(sqlcmdDELETE, (v_namedb,))
+                cursor.execute(sqlcmdDELETE, (v_namedb,))
 
-            conn.commit()
-            RowCountDelete = conn.total_changes
+            cnxn.commit()
+            RowCountDelete = cnxn.total_changes
 
             ## sql statement INSERT
             sqlcmdINSERT = '''
@@ -348,9 +366,9 @@ def gravaDadosSqlite(v_ListInfoDbs):
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'));
             '''
-            cur.executemany(sqlcmdINSERT, v_ListInfoDbs)
-            RowCountInsert = conn.total_changes
-            conn.commit()
+            cursor.executemany(sqlcmdINSERT, v_ListInfoDbs)
+            RowCountInsert = cnxn.total_changes
+            cnxn.commit()
 
     except sqlite3.Error as e:
         datahora = obterDataHora()
@@ -366,7 +384,7 @@ def gravaDadosSqlite(v_ListInfoDbs):
 
 def exibeDadosSqlite():
     #dbname_sqlite3 = "database_bi.db"
-    dbname_sqlite3 = os.getenv("DATABASE_TARGET_SQLITE")
+    dbname_sqlite3 = getValueEnv("DATABASE_TARGET_SQLITE")
     path_dir_db = os.path.join(dirapp, 'db')
     path_full_dbname_sqlite3 = os.path.join(path_dir_db, dbname_sqlite3)
 
@@ -456,9 +474,11 @@ def gravaDadosDestinoAzureSQL(listSource):
 
     finally:
         ## Close the database connection
-        cursor.close()
-        del cursor
-        cnxn.close()
+        if 'cursor' in locals():
+            cursor.close()
+            del cursor
+        if 'cnxn' in locals(): 
+            cnxn.close()
         datahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         msgLog = 'Quantidade de Registros Inseridos no destino AzureSQL: {0}\n'.format(RowCount)
         msgLog = '{0}Fim insercao de dados no destino AzureSQL - {1}'.format(msgLog, datahora)
