@@ -531,10 +531,10 @@ def main():
                 # para isso tirar o comentario da chamada da funcao
                 #gravaDadosDestinoAzureSQL(listInfoDatabases)
             else:
-                msgLog = 'Nao foi possivel obter informacoes dos databases.'
+                msgLog = 'Nao foi possivel obter informacoes dos databases no servidor: {0}.'.format(server)
                 print(GravaLog(msgLog, 'a'))
         else:
-            msgLog = 'Nao foi possivel obter a lista de databases.'
+            msgLog = 'Nao foi possivel obter a lista de databases no servidor: {0}.'.format(server)
             print(GravaLog(msgLog, 'a'))  
 
     ## verifica se deve exibir os dados do sqlite
