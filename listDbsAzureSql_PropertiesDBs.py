@@ -12,6 +12,7 @@ from datetime import datetime
 
 ## Local raiz da aplicacao
 dirapp = os.path.dirname(os.path.realpath(__file__))
+DRIVER_SQLSERVER_ODBC = '{ODBC Driver 17 for SQL Server}'
 
 ## Carrega os valores do .env
 dotenvProd = os.path.join(dirapp, '.env.prod')
@@ -80,12 +81,12 @@ def strConnectionDatabaseOrigem(p_server):
     username = getValueEnv("USERNAME_SOURCE_AZURESQL")
     password = getValueEnv("PASSWORD_SOURCE_AZURESQL")
 
-    strConnection = 'DRIVER={{ODBC Driver 17 for SQL Server}};\
+    strConnection = 'DRIVER={v_DRIVER};\
         SERVER={v_server};\
         PORT={v_port};\
         DATABASE={v_database};\
         UID={v_username};\
-        PWD={v_password}'.format(v_server = server, v_port = port, v_database = database, v_username = username, v_password = password)
+        PWD={v_password}'.format(v_DRIVER= DRIVER_SQLSERVER_ODBC, v_server = server, v_port = port, v_database = database, v_username = username, v_password = password)
 
     return strConnection
 
@@ -100,12 +101,12 @@ def strConnectionDatabaseDestino():
     username = getValueEnv("USERNAME_TARGET_AZURESQL")
     password = getValueEnv("PASSWORD_TARGET_AZURESQL")
 
-    strConnection = 'DRIVER={{ODBC Driver 17 for SQL Server}};\
+    strConnection = 'DRIVER={v_DRIVER};\
         SERVER={v_server};\
         PORT={v_port};\
         DATABASE={v_database};\
         UID={v_username};\
-        PWD={v_password}'.format(v_server = server, v_port = port, v_database = database, v_username = username, v_password = password)
+        PWD={v_password}'.format(v_DRIVER= DRIVER_SQLSERVER_ODBC, v_server = server, v_port = port, v_database = database, v_username = username, v_password = password)
 
     return strConnection
 
@@ -113,31 +114,38 @@ def strConnectionDatabaseDestino():
 ## funcao para obter os nomes dos databases
 def getListNameDatabasesOrigem(p_server):
 
+    connString = str(strConnectionDatabaseOrigem(p_server)).replace('##DATABASE.NAME##', str('master'))
+    cnxn = None
+    cursor = None
+    listDbNames = []
+
     try:
 
-        connString = str(strConnectionDatabaseOrigem(p_server)).replace('##DATABASE.NAME##', str('master'))
-        cnxn = po.connect(connString)
-        cursor = cnxn.cursor()
-
-        sqlcmd = """
-        SELECT [name] FROM sys.databases WHERE [name] <> 'master'
-        """
-
-        listDbNames = list(cursor.execute(sqlcmd).fetchall())
-        #listDbNames = []
-        #cursor.execute(sqlcmd)
-        #listDbNames = list(cursor.fetchall())
+        with po.connect(connString) as cnxn:
+            with cnxn.cursor() as cursor:
+                sqlcmd = """
+                SELECT [name] FROM sys.databases WHERE [name] <> 'master'
+                """
+				
+                listDbNames = cursor.execute(sqlcmd).fetchall()
 
     except Exception as e:
         msgLog = 'Erro ao obter os nomes dos databases'
         log_error(e, msgLog)
 
     finally:
-        if 'cursor' in locals():
+       ## Close the database connection
+        if cursor:
             cursor.close()
             del cursor
-        if 'cnxn' in locals(): 
+            msgLog = "Cursor encerrado."
+            print(GravaLog(msgLog, 'a'))
+        
+        if cnxn:
             cnxn.close()
+            msgLog = "Conexao com AzureSQL encerrada."
+            print(GravaLog(msgLog, 'a'))
+            
         datahora = obterDataHora()
         msgLog = 'Concluido a coleta dos nomes dos databases - {0}'.format(datahora)
         print(GravaLog(msgLog, 'a'))
@@ -148,113 +156,114 @@ def getListNameDatabasesOrigem(p_server):
 ## funcao para obter informações dos databases
 def getListInfoDatabasesOrigem(p_server, p_listDBNames):
 
-    try:
+    cnxn = None
+    cursor = None
+    
+    listInfoDbNames = []
 
-        listInfoDbNames = []
-        listDbsAux = []
+    try:
 
         tamlist =  range(len(p_listDBNames))
         for i in tamlist:
             v_dbname = str(p_listDBNames[i][0])
-
+            
             msgLog = 'Coletando informacoes do database: [{0}]'.format(v_dbname)
-            print(GravaLog(msgLog, 'a'))
+            print(msgLog)
 
             connString = str(strConnectionDatabaseOrigem(p_server)).replace('##DATABASE.NAME##', v_dbname)
-            cnxn = po.connect(connString)
-            cursor = cnxn.cursor()
+		
+            with po.connect(connString) as cnxn:
+                with cnxn.cursor() as cursor:
+                    sqlcmd = """
+                    ; WITH SpaceDBAux AS (
+                        SELECT 
+                            DB_NAME() as DatabaseName, 
+                            (CAST(DATABASEPROPERTYEX(DB_NAME(), 'MaxSizeInBytes') as bigint))/(1024*1024*1024) as [MaxStorageinGB],
+                            SUM(size/128.0)/1024 AS [AllocatedSpaceinGB], 
+                            SUM(size/128.0 - CAST(FILEPROPERTY(name, 'SpaceUsed') AS int)/128.0) /1024 AS [AllocatedSpaceUnusedInGB] 
+                            FROM sys.database_files 
+                            GROUP BY type_desc 
+                            HAVING type_desc = 'ROWS'
+                    ), SpaceDBFinal AS ( 
+                        SELECT
+                            ([AllocatedSpaceinGB] - [AllocatedSpaceUnusedInGB]) AS [UsedSpaceinGB],
+                            [MaxStorageinGB],
+                            [AllocatedSpaceinGB],
+                            [MaxStorageinGB] - (([AllocatedSpaceinGB] - [AllocatedSpaceUnusedInGB])) AS [RemainingSpaceinGB]
+                        FROM SpaceDBAux
+                    ), InfoDbsFinal (
+                        DatabaseName, Edition, ServiceObjective, [MaxStorageinGB], 
+                        [AllocatedSpaceinGB], [UsedSpaceinGB], [RemainingSpaceinGB]) 
+                    AS (
+                        SELECT 
+                            DB_NAME() AS DatabaseName, 
+                            CAST(DATABASEPROPERTYEX(DB_NAME(), 'Edition') AS VARCHAR(60)) as Edition, 
+                            CAST(DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective') AS VARCHAR(60)) as ServiceObjective,
+                            [MaxStorageinGB],
+                            [AllocatedSpaceinGB],
+                            [UsedSpaceinGB],
+                            [RemainingSpaceinGB]
+                        FROM SpaceDBFinal
+                    ), InfoCapacityDtu ([DatabaseName], [CapacityDtu]) AS (
+                        SELECT
+                            DB_NAME() AS DatabaseName,
+                            Capacity = CASE DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective') 
+                                --BASIC
+                                WHEN 'Basic' THEN 5
+                                
+                                --STANDARD
+                                WHEN 'S0' THEN 10
+                                WHEN 'S1' THEN 20
+                                WHEN 'S2' THEN 50
+                                WHEN 'S3' THEN 100
+                                WHEN 'S4' THEN 200
+                                WHEN 'S6' THEN 400
+                                WHEN 'S7' THEN 800
+                                WHEN 'S9' THEN 1600
+                                WHEN 'S12' THEN 3000
 
-            sqlcmd = """
-              ; WITH SpaceDBAux AS (
-                SELECT
-                    DB_NAME() as DatabaseName,
-                    (CAST(DATABASEPROPERTYEX(DB_NAME(), 'MaxSizeInBytes') as bigint))/(1024*1024*1024) as [MaxStorageinGB],
-                    SUM(size/128.0)/1024 AS [AllocatedSpaceinGB],
-                    SUM(size/128.0 - CAST(FILEPROPERTY(name, 'SpaceUsed') AS int)/128.0) /1024 AS [AllocatedSpaceUnusedInGB]
-                    FROM sys.database_files
-                    GROUP BY type_desc
-                    HAVING type_desc = 'ROWS'
-            ), SpaceDBFinal AS (
-                SELECT
-                    ([AllocatedSpaceinGB] - [AllocatedSpaceUnusedInGB]) AS [UsedSpaceinGB],
-                    [MaxStorageinGB],
-                    [AllocatedSpaceinGB],
-                    [MaxStorageinGB] - (([AllocatedSpaceinGB] - [AllocatedSpaceUnusedInGB])) AS [RemainingSpaceinGB]
-                FROM SpaceDBAux
-            ), InfoDbsFinal (
-                DatabaseName, Edition, ServiceObjective, [MaxStorageinGB],
-                [AllocatedSpaceinGB], [UsedSpaceinGB], [RemainingSpaceinGB])
-            AS (
-                SELECT
-                    DB_NAME() AS DatabaseName,
-                    CAST(DATABASEPROPERTYEX(DB_NAME(), 'Edition') AS VARCHAR(60)) as Edition,
-                    CAST(DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective') AS VARCHAR(60)) as ServiceObjective,
-                    [MaxStorageinGB],
-                    [AllocatedSpaceinGB],
-                    [UsedSpaceinGB],
-                    [RemainingSpaceinGB]
-                FROM SpaceDBFinal
-            ), InfoCapacityDtu ([DatabaseName], [CapacityDtu]) AS (
-                SELECT
-                    DB_NAME() AS DatabaseName,
-                    Capacity = CASE DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective')
-                        --BASIC
-                        WHEN 'Basic' THEN 5
+                                --PREMIUM
+                                WHEN 'P1' THEN 125
+                                WHEN 'P2' THEN 250
+                                WHEN 'P4' THEN 500
+                                WHEN 'P6' THEN 1000
+                                WHEN 'P11' THEN 1750
+                                WHEN 'P15' THEN 4000
 
-                        --STANDARD
-                        WHEN 'S0' THEN 10
-                        WHEN 'S1' THEN 20
-                        WHEN 'S2' THEN 50
-                        WHEN 'S3' THEN 100
-                        WHEN 'S4' THEN 200
-                        WHEN 'S6' THEN 400
-                        WHEN 'S7' THEN 800
-                        WHEN 'S9' THEN 1600
-                        WHEN 'S12' THEN 3000
+                                --ELSE 'N/D'
+                            END	
+                    )
+                    SELECT
+                        @@SERVERNAME AS [SERVERNAME], 
+                        I.DatabaseName,
+                        I.Edition,
+                        I.ServiceObjective,
+                        D.CapacityDtu,
+                        I.MaxStorageinGB,
+                        I.AllocatedSpaceinGB,
+                        I.UsedSpaceinGB,
+                        I.RemainingSpaceinGB
+                    FROM InfoDbsFinal I 
+                    INNER JOIN InfoCapacityDtu D ON D.DatabaseName = I.DatabaseName
+                    """
+                    
+                    registros = cursor.execute(sqlcmd).fetchall()
+                    for registro in registros:    
+                        ServerName         = registro[0]
+                        DatabaseName       = registro[1]
+                        Edition            = registro[2]
+                        ServiceObjective   = registro[3]
+                        CapacityDtu        = registro[4]
+                        MaxStorageinGB     = float(registro[5])
+                        AllocatedSpaceinGB = float(registro[6])
+                        UsedSpaceinGB      = float(registro[7])
+                        RemainingSpaceinGB = float(registro[8])
 
-                        --PREMIUM
-                        WHEN 'P1' THEN 125
-                        WHEN 'P2' THEN 250
-                        WHEN 'P4' THEN 500
-                        WHEN 'P6' THEN 1000
-                        WHEN 'P11' THEN 1750
-                        WHEN 'P15' THEN 4000
-
-                        ELSE 'N/D'
-                    END
-            )
-            SELECT
-                @@SERVERNAME AS [SERVERNAME],
-                I.DatabaseName,
-                I.Edition,
-                I.ServiceObjective,
-                D.CapacityDtu,
-                I.MaxStorageinGB,
-                I.AllocatedSpaceinGB,
-                I.UsedSpaceinGB,
-                I.RemainingSpaceinGB
-            FROM InfoDbsFinal I
-            INNER JOIN InfoCapacityDtu D ON D.DatabaseName = I.DatabaseName
-            """
-
-            registros = cursor.execute(sqlcmd).fetchall()
-            for registro in registros:
-                ServerName         = registro[0]
-                DatabaseName       = registro[1]
-                Edition            = registro[2]
-                ServiceObjective   = registro[3]
-                CapacityDtu        = registro[4]
-                MaxStorageinGB     = registro[5]
-                AllocatedSpaceinGB = registro[6]
-                UsedSpaceinGB      = registro[7]
-                RemainingSpaceinGB = registro[8]
-
-                strListValues = '{0},{1},{2},{3},{4},{5},{6},{7},{8}'\
-                    .format(ServerName, DatabaseName, Edition, ServiceObjective, CapacityDtu,
-                            MaxStorageinGB, AllocatedSpaceinGB, UsedSpaceinGB, RemainingSpaceinGB)
-
-                listDbsAux = strListValues.split(',')
-                listInfoDbNames.append(listDbsAux)
+                        listInfoDbNames.append([
+                            ServerName, DatabaseName, Edition, ServiceObjective,
+                            CapacityDtu, MaxStorageinGB, AllocatedSpaceinGB,
+                            UsedSpaceinGB, RemainingSpaceinGB
+                        ])
 
 
     except Exception as e:
@@ -262,11 +271,18 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
         log_error(e, msgLog)
 
     finally:
-        if 'cursor' in locals():
+        ## Close the database connection
+        if cursor:
             cursor.close()
             del cursor
-        if 'cnxn' in locals(): 
+            msgLog = "Cursor encerrado."
+            print(GravaLog(msgLog, 'a'))
+        
+        if cnxn:
             cnxn.close()
+            msgLog = "Conexao com AzureSQL encerrada."
+            print(GravaLog(msgLog, 'a'))
+            
         datahora = obterDataHora()
         msgLog = 'Concluido a coleta das informacoes dos databases - {0}'.format(datahora)
         print(GravaLog(msgLog, 'a'))
@@ -305,9 +321,6 @@ def create_tables(dbname_sqlite3):
     # cria o diretorio caso nao exista
     if not os.path.exists(path_dir_db):
         os.makedirs(path_dir_db)
-    else:
-        pass
-
 
     try:
         with sqlite3.connect(path_full_dbname_sqlite3) as cnxn:
@@ -336,9 +349,6 @@ def gravaDadosSqlite(v_ListInfoDbs):
     # caso não exista realizada a chamada da funcao de criacao
     if not os.path.exists(path_dir_db):
         create_tables(dbname_sqlite3)
-    else:
-        pass
-
 
     try:
         with sqlite3.connect(path_full_dbname_sqlite3) as cnxn:
@@ -405,7 +415,7 @@ def exibeDadosSqlite():
                 RemainingSpaceinGB,
                 UltimaVerificacao
             FROM infoDatabaseAzureSql
-            --HERE Database != 'master';
+            -- WHERE Database != 'master';
             """
 
             df = pd.read_sql(sqlcmd, conn)
@@ -424,42 +434,46 @@ def exibeDadosSqlite():
 ## Grava dados no destino
 def gravaDadosDestinoAzureSQL(listSource):
 
+    cnxn = None
+    cursor = None
+    RowCount = 0
+
     try:
         ## Connection string
         connString = str(strConnectionDatabaseDestino())
-        cnxn = po.connect(connString)
-        cnxn.autocommit = False
 
-        ## query de busca
-        cursor = cnxn.cursor()
+        with po.connect(connString, autocommit=False) as cnxn:
+            with cnxn.cursor() as cursor:
 
-        for i in range(len(listSource)):
-            v_namedb = str(listSource[i][1])
+                for i in range(len(listSource)):
+                    v_namedb = str(listSource[i][1])
+                                        
+                    ## sql statement DELETE
+                    sqlcmdDELETE = """DELETE FROM InfoDatabaseAzureSql 
+                    WHERE [Database] = ? 
 
-            ## sql statement DELETE
-            #sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = '{}';".format(v_namedb)
-            sqlcmdDELETE = "DELETE FROM InfoDatabaseAzureSql WHERE [Database] = ?;"
-            cursor.execute(sqlcmdDELETE, (v_namedb,))
+                    --REMOVE REGISTROS QUE ESTAO MAIS ANTIGOS QUE 10 DIAS
+                    OR DATEDIFF(DAY, [UltimaVerificacao], GETDATE()) > 10;
+                    """
+                    cursor.execute(sqlcmdDELETE, (v_namedb,))
 
-        ## sql statement INSERT
-        sqlcmd = '''
-            INSERT INTO [dbo].[InfoDatabaseAzureSql]
-            (
-                [ServerName], [Database],
-                [Edition], [ServiceObject],
-                [CapacityDtu], [MaxStorageinGB],
-                [AllocatedSpaceinGB], [UsedSpaceinGB],
-                [RemainingSpaceinGB], [UltimaVerificacao]
-            )
-            VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE());
-        '''
-
-        RowCount = 0
-        for params in listSource:
-            cursor.execute(sqlcmd, params)
-            RowCount = RowCount + cursor.rowcount
-
+                ## sql statement INSERT
+                sqlcmd = '''
+                    INSERT INTO [dbo].[InfoDatabaseAzureSql]
+                    (   
+                        [ServerName], [Database], 
+                        [Edition], [ServiceObject], 
+                        [CapacityDtu], [MaxStorageinGB], 
+                        [AllocatedSpaceinGB], [UsedSpaceinGB], 
+                        [RemainingSpaceinGB], [UltimaVerificacao]
+                    ) 
+                    VALUES 
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE());
+                '''
+                
+                for params in listSource:
+                    cursor.execute(sqlcmd, params)
+                    RowCount = RowCount + cursor.rowcount
 
     except Exception as e:
         msgLog = 'Erro na operacao de insert na tabela AzureSQL [InfoDatabaseAzureSql]'
@@ -471,14 +485,19 @@ def gravaDadosDestinoAzureSQL(listSource):
 
     finally:
         ## Close the database connection
-        if 'cursor' in locals():
+        if cursor:
             cursor.close()
             del cursor
-        if 'cnxn' in locals(): 
+            msgLog = "Cursor encerrado."
+            print(GravaLog(msgLog, 'a'))
+        
+        if cnxn:
             cnxn.close()
-        datahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        msgLog = 'Quantidade de Registros Inseridos no destino AzureSQL: {0}\n'.format(RowCount)
-        msgLog = '{0}Fim insercao de dados no destino AzureSQL - {1}'.format(msgLog, datahora)
+            msgLog = "Conexao com AzureSQL encerrada."
+            print(GravaLog(msgLog, 'a'))
+        
+        datahora = obterDataHora()
+        msgLog = 'Quantidade de Registros Inseridos no destino AzureSQL: {0}\nFim insercao de dados no destino AzureSQL - {1}'.format(RowCount, datahora)
         print(GravaLog(msgLog, 'a'))
 
 
@@ -490,21 +509,41 @@ def main():
     msgLog = '***** Inicio da aplicacao: {0}'.format(datahora)
     print(GravaLog(msgLog, 'w'))
 
+    v_exibirDados = False
+
     #listServers = ['SERVER01', 'SERVER02']
     listServers = ['SERVER01']
 
     for server in listServers:
         lisdtdbNames = getListNameDatabasesOrigem(server)
-        listInfoDatabases = getListInfoDatabasesOrigem(server, lisdtdbNames)
-        
-        # grava dados no SQLite como destino dos dados
-        gravaDadosSqlite(listInfoDatabases)
-        
-        # grava dados no SQL Server/Azure SQL como destino dos dados
-        # para isso tirar o comentario da chamada da funcao
-        #gravaDadosDestinoAzureSQL(listInfoDatabases)
 
-    exibeDadosSqlite()
+        if lisdtdbNames:
+            listInfoDatabases = getListInfoDatabasesOrigem(server, lisdtdbNames)
+
+            if listInfoDatabases:
+
+                v_exibirDados = True
+                
+                # grava dados no SQLite como destino dos dados
+                gravaDadosSqlite(listInfoDatabases)
+
+                # grava dados no SQL Server/Azure SQL como destino dos dados
+                # para isso tirar o comentario da chamada da funcao
+                #gravaDadosDestinoAzureSQL(listInfoDatabases)
+            else:
+                msgLog = 'Nao foi possivel obter informacoes dos databases.'
+                print(GravaLog(msgLog, 'a'))
+        else:
+            msgLog = 'Nao foi possivel obter a lista de databases.'
+            print(GravaLog(msgLog, 'a'))  
+
+    ## verifica se deve exibir os dados do sqlite
+    if v_exibirDados:
+        ## exibir dados do sqlite
+        exibeDadosSqlite()
+    else:
+        msgLog = 'Nao existem dados a exibir no momento.'
+        print(GravaLog(msgLog, 'a'))
 
     ## log do final da aplicacao
     datahora = obterDataHora()
