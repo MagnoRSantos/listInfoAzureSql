@@ -167,7 +167,7 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
         for i in tamlist:
             v_dbname = str(p_listDBNames[i][0])
             
-            msgLog = 'Coletando informacoes do database: [{0}]'.format(v_dbname)
+            msgLog = '[{0}] - Coletando informacoes do database: [{1}]'.format(p_server, v_dbname)
             print(msgLog)
 
             connString = str(strConnectionDatabaseOrigem(p_server)).replace('##DATABASE.NAME##', v_dbname)
@@ -267,7 +267,7 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
 
 
     except Exception as e:
-        msgLog = 'Erro ao obter informacoes dos databases'
+        msgLog = '[{0}] - Erro ao obter informacoes dos databases'.format(p_server)
         log_error(e, msgLog)
 
     finally:
@@ -284,7 +284,7 @@ def getListInfoDatabasesOrigem(p_server, p_listDBNames):
             print(GravaLog(msgLog, 'a'))
             
         datahora = obterDataHora()
-        msgLog = 'Concluido a coleta das informacoes dos databases - {0}'.format(datahora)
+        msgLog = '[{0}] - Concluido a coleta das informacoes dos databases - {1}'.format(p_server, datahora)
         print(GravaLog(msgLog, 'a'))
 
     return listInfoDbNames
